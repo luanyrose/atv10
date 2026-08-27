@@ -9,8 +9,11 @@ Text,
 TouchableOpacity,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import SHA1 from 'crypto-js/sha1';
 const CLOUD_NAME = 'wljwnlav'//;
 const UPLOAD_PRESET = 'atvd10'//;
+const API_KEY = '116287736947173';
+const API_SECRET = '5Dff44koKO6iZWpi4CxW74HFBNc';
 export default function UploadImagem() {
 const [imagem, setImagem] = useState(null);
 const [imagens, setImagens] = useState([]);
@@ -45,7 +48,7 @@ const data = await response.json();
 if (!response.ok)
 throw new Error(data?.error?.message || 'Erro no upload');
 setImagens((lista) => [
-{ id: data.public_id, url: data.secure_url },
+{ id: data.public_id, public_id: data.public_id, url: data.secure_url },
 ...lista,
 ]);
 setImagem(null);
@@ -57,6 +60,39 @@ Alert.alert('Erro', error.message);
 setEnviando(false);
 }
 };
+
+const deleteImage = async (publicId) => {
+try {
+const timestamp = Math.floor(Date.now() / 1000);
+const signature = SHA1(
+`public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`
+).toString();
+const formData = new FormData();
+formData.append('public_id', publicId);
+formData.append('signature', signature);
+formData.append('api_key', API_KEY);
+formData.append('timestamp', timestamp);
+const del = await fetch(
+`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`,
+{
+method: 'POST',
+body: formData,
+}
+);
+const result = await del.json();
+console.log('Delete result:', result);
+if (result.result === 'ok') {
+setImagens((prev) => prev.filter((img) => img.public_id !== publicId));
+Alert.alert('Sucesso', 'Imagem excluída com sucesso!');
+} else {
+Alert.alert('Erro', 'Erro ao excluir no Cloudinary!');
+}
+} catch (error) {
+console.log('Erro ao excluir', error);
+Alert.alert('Erro', 'Não foi possível excluir');
+}
+};
+
 const Botao = ({ titulo, onPress, disabled }) => (
 <TouchableOpacity
 onPress={onPress}
@@ -125,20 +161,24 @@ gap: 10,
 }}
 >
 {imagens.map((item) => (
+<View key={item.id} style={{ width: '48%', gap: 8 }}>
 <Image
-key={item.id}
 source={{ uri: item.url }}
 style={{
-width: '48%',
+width: '100%',
 height: 160,
 borderRadius: 12,
 
 }}
 />
+<Botao titulo="Excluir imagem" onPress={() => deleteImage(item.public_id)} />
+</View>
 ))}
 </View>
 </View>
 )}
+
 </ScrollView>
 );
+
 }
